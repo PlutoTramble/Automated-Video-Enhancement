@@ -4,6 +4,7 @@ import sys
 import cv2
 from pathlib import Path
 
+
 class video:
     def __init__(self, path: str):
         try:
@@ -16,8 +17,8 @@ class video:
         self.vidTotalFrames = (self.__video.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # Resolution
-        self.vidWidth = int(self.__video.get(cv2.CAP_PROP_FRAME_WIDTH ))
-        self.vidHeight = int(self.__video.get(cv2.CAP_PROP_FRAME_HEIGHT ))
+        self.vidWidth = int(self.__video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.vidHeight = int(self.__video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Path and filename
         self.path = path
@@ -46,51 +47,57 @@ class video:
     ## FIXME handle properly color profile
     # Sets the color profile settings for ffmpeg
     def get_color_profile_settings(self, vid_or_png: str):
-        colorInfo = os.popen(f"ffprobe -v error -show_entries "
-                             f"stream=pix_fmt,color_space,color_range,"
-                             f"color_transfer,color_primaries -of "
-                             f"default=noprint_wrappers=1 {self.path}")\
-                      .read().splitlines()
-
-        pixelFormat = colorInfo[0][8:]
-        if not pixelFormat == 'unknown':
-            colorSettingsVid = "-pix_fmt " + pixelFormat
-        else:
-            colorSettingsVid = "-pix_fmt yuv420p"
-        colorSettingsPng = "-pix_fmt rgb24"
-
-        colorSpace = colorInfo[2][12:]
-        if not colorSpace == 'unknown':
-            colorSettingsVid += " -colorspace " + colorSpace
-            colorSettingsPng += " -colorspace " + colorSpace
-
-        colorPrimaries = colorInfo[4][16:]
-        if not colorPrimaries == 'unknown':
-            colorSettingsVid += " -color_primaries " + colorPrimaries
-            colorSettingsPng += " -color_primaries " + colorPrimaries
-
-        if vid_or_png.lower() == 'vid':
-            return colorSettingsVid
-        elif vid_or_png.lower() == 'png':
-            return colorSettingsPng
-        else:
+        if vid_or_png.lower() != 'vid' or vid_or_png.lower() != 'png':
             raise IOError("The option is either 'vid' or 'png'.")
 
+        color_info = os.popen(f"ffprobe -v error -show_entries "
+                              f"stream=pix_fmt,color_space,color_range,"
+                              f"color_transfer,color_primaries -of "
+                              f"default=noprint_wrappers=1 {self.path}") \
+            .read().splitlines()
+
+        color_setting_vid = ""
+
+        pixel_format = color_info[0][8:]
+        if not pixel_format == 'unknown':
+            color_setting_vid += "-pix_fmt " + pixel_format
+        else:
+            color_setting_vid += "-pix_fmt yuv420p"
+
+        color_setting_png = "-pix_fmt rgb24"
+
+        color_space = color_info[2][12:]
+        if color_space is not 'unknown':
+            color_setting_vid += " -colorspace " + color_space
+            color_setting_png += " -colorspace " + color_space
+
+        colorPrimaries = color_info[4][16:]
+        if colorPrimaries is not 'unknown':
+            color_setting_vid += " -color_primaries " + colorPrimaries
+            color_setting_png += " -color_primaries " + colorPrimaries
+
+        if vid_or_png.lower() is 'vid':
+            return color_setting_vid
+        else:
+            return color_setting_png
+
     # True if the current video is under the resolution threshold
-    def isUnderResolutionThreshold(self, pWidthxHeight :str):
-        widthThreshold = int(pWidthxHeight.lower().split('x')[0])
-        heightThreshold = int(pWidthxHeight.lower().split('x')[1])
-        if ((widthThreshold >= self.vidWidth and heightThreshold >= self.vidHeight) or \
-                (heightThreshold >= self.vidWidth and widthThreshold >= self.vidHeight)):
+    def is_under_resolution_threshold(self, width_x_height: str):
+        width_threshold = int(width_x_height.lower().split('x')[0])
+        height_threshold = int(width_x_height.lower().split('x')[1])
+        if ((width_threshold >= self.vidWidth and
+             height_threshold >= self.vidHeight) or
+                (height_threshold >= self.vidWidth and
+                 width_threshold >= self.vidHeight)):
             return True
         else:
             return False
 
     # To fix too much bitrate for certain videos
-    def ffmpegBitrateCommand(self):
-        totalSecondsDuration = float(self.vidTotalFrames / self.fps)
+    def ffmpeg_bitrate_command(self):
+        total_seconds_duration = float(self.vidTotalFrames / self.fps)
         filesize = os.path.getsize(self.path)
-        bitrate = int((filesize /totalSecondsDuration ) /102 4 *8)
+        bitrate = int((filesize / total_seconds_duration) / 1024 * 8)
 
         # The option will not work if it's under 1080p
         if (self.vidWidth <= 1920 and self.vidHeight <= 1080) or \
@@ -104,6 +111,6 @@ class video:
         elif bitrate > 20000:
             bitrate = bitrate + ((bitrate * 20) / 100)
             return f"-maxrate {bitrate} -bufsize {bitrate}"
-        elif bitrate > 10000:
+        elif bitrate >= 10000:
             bitrate = bitrate + ((bitrate * 20) / 100)
             return f"-maxrate {bitrate} -bufsize {bitrate}"
