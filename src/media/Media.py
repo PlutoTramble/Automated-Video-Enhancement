@@ -5,7 +5,7 @@ import cv2
 from pathlib import Path
 
 
-class Video:
+class VideoMedia:
     def __init__(self, path: str):
         try:
             self.__video = cv2.VideoCapture(path)
@@ -13,68 +13,68 @@ class Video:
             sys.exit(2)
 
         # Frames
-        self.fps = float(self.__video.get(cv2.CAP_PROP_FPS))
-        self.vidTotalFrames = (self.__video.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.fps: float = float(self.__video.get(cv2.CAP_PROP_FPS))
+        self.vid_total_frames: int = (self.__video.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # Resolution
-        self.vidWidth = int(self.__video.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.vidHeight = int(self.__video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.vid_width: int = int(self.__video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.vid_height: int = int(self.__video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Path and filename
-        self.path = path
-        self.filename = os.path.basename(self.path)
-        self.suffix = Path(self.filename.lower()).suffix
+        self.path: str = path
+        self.filename: str = os.path.basename(self.path)
+        self.suffix: str = Path(self.filename.lower()).suffix
 
     # How many times does the interpolation AI
     # needs to run to reach the target frame per second
-    def get_estim_num_of_run(self, target_FPS):
-        ## FIXME What if target_FPS is null
-        number_of_times = 0
-        future_FPS = self.fps
-        while future_FPS < target_FPS:
-            future_FPS *= 2
+    def get_estim_num_of_run(self, target_fps: float) -> int:
+        # FIXME What if target_FPS is null
+        number_of_times: int = 0
+        future_fps: float = self.fps
+        while future_fps < target_fps:
+            future_fps *= 2
             number_of_times += 1
         return number_of_times
 
     # It is necessary for encoding from png files to video
-    def get_exagerated_FPS(self, target_FPS):
-        ## FIXME What if target_FPS is null
-        future_FPS = self.fps
-        while future_FPS < target_FPS:
-            future_FPS *= 2
-        return future_FPS
+    def get_exaggerated_fps(self, target_fps: float) -> float:
+        # FIXME What if target_FPS is null
+        future_fps: float = self.fps
+        while future_fps < target_fps:
+            future_fps *= 2
+        return future_fps
 
-    ## FIXME handle properly color profile
+    # FIXME handle properly color profile
     # Sets the color profile settings for ffmpeg
-    def get_color_profile_settings(self, vid_or_png: str):
+    def get_color_profile_settings(self, vid_or_png: str) -> str:
         if vid_or_png.lower() != 'vid' or vid_or_png.lower() != 'png':
             raise IOError("The option is either 'vid' or 'png'.")
 
-        color_info = os.popen(f"ffprobe -v error -show_entries "
-                              f"stream=pix_fmt,color_space,color_range,"
-                              f"color_transfer,color_primaries -of "
-                              f"default=noprint_wrappers=1 {self.path}") \
+        color_info: list[str] = os.popen(f"ffprobe -v error -show_entries "
+                                         f"stream=pix_fmt,color_space,color_range,"
+                                         f"color_transfer,color_primaries -of "
+                                         f"default=noprint_wrappers=1 {self.path}") \
             .read().splitlines()
 
-        color_setting_vid = ""
+        color_setting_vid: str = ""
 
-        pixel_format = color_info[0][8:]
+        pixel_format: str = color_info[0][8:]
         if not pixel_format == 'unknown':
             color_setting_vid += "-pix_fmt " + pixel_format
         else:
             color_setting_vid += "-pix_fmt yuv420p"
 
-        color_setting_png = "-pix_fmt rgb24"
+        color_setting_png: str = "-pix_fmt rgb24"
 
-        color_space = color_info[2][12:]
+        color_space: str = color_info[2][12:]
         if color_space is not 'unknown':
             color_setting_vid += " -colorspace " + color_space
             color_setting_png += " -colorspace " + color_space
 
-        colorPrimaries = color_info[4][16:]
-        if colorPrimaries is not 'unknown':
-            color_setting_vid += " -color_primaries " + colorPrimaries
-            color_setting_png += " -color_primaries " + colorPrimaries
+        color_primaries: str = color_info[4][16:]
+        if color_primaries is not 'unknown':
+            color_setting_vid += " -color_primaries " + color_primaries
+            color_setting_png += " -color_primaries " + color_primaries
 
         if vid_or_png.lower() is 'vid':
             return color_setting_vid
@@ -82,26 +82,26 @@ class Video:
             return color_setting_png
 
     # True if the current video is under the resolution threshold
-    def is_under_resolution_threshold(self, width_x_height: str):
-        width_threshold = int(width_x_height.lower().split('x')[0])
-        height_threshold = int(width_x_height.lower().split('x')[1])
-        if ((width_threshold >= self.vidWidth and
-             height_threshold >= self.vidHeight) or
-                (height_threshold >= self.vidWidth and
-                 width_threshold >= self.vidHeight)):
+    def is_under_resolution_threshold(self, width_x_height: str) -> bool:
+        width_threshold: int = int(width_x_height.lower().split('x')[0])
+        height_threshold: int = int(width_x_height.lower().split('x')[1])
+        if ((width_threshold >= self.vid_width and
+             height_threshold >= self.vid_height) or
+                (height_threshold >= self.vid_width and
+                 width_threshold >= self.vid_height)):
             return True
         else:
             return False
 
     # To fix too much bitrate for certain videos
-    def ffmpeg_bitrate_command(self):
-        total_seconds_duration = float(self.vidTotalFrames / self.fps)
-        filesize = os.path.getsize(self.path)
+    def ffmpeg_bitrate_command(self) -> str:
+        total_seconds_duration = float(self.vid_total_frames / self.fps)
+        filesize: int = os.path.getsize(self.path)
         bitrate = int((filesize / total_seconds_duration) / 1024 * 8)
 
         # The option will not work if it's under 1080p
-        if (self.vidWidth <= 1920 and self.vidHeight <= 1080) or \
-                (self.vidWidth <= 1080 and self.vidHeight <= 1920):
+        if (self.vid_width <= 1920 and self.vid_height <= 1080) or \
+                (self.vid_width <= 1080 and self.vid_height <= 1920):
             return ""
 
         if bitrate < 10000:

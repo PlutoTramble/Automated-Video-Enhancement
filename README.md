@@ -37,8 +37,8 @@ main.py -i <input-file/folder> -o <output-file/folder>
 
 ## Installation
 ### Dependencies
-* Has only have been tested on Linux
-* Python 3
+* Has only had been tested on Linux
+* Python 3.11
   * opencv2
 * ffmpeg
 * Large storage device for temporary directory (optionnal but recommended)
@@ -53,5 +53,5 @@ The directory should look like this:
 ![My Image](images/whereToPutStuff.png)
 
 # TODO
-* Make it work on Mac OS (Needs testing)
+* Make it work on macOS (Needs testing)
 * Make it work on Windows
