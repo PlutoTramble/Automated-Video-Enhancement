@@ -5,7 +5,7 @@ import cv2
 from pathlib import Path
 
 
-class video:
+class Video:
     def __init__(self, path: str):
         try:
             self.__video = cv2.VideoCapture(path)

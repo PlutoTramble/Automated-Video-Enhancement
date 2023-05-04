@@ -217,7 +217,7 @@ def Handler(pOptions:dict, pVideo:video):
                 # SRMD
                 if pVideo.isUnderResolutionThreshold(resolutionThreshold):
                     print("\nRunning SRMD to denoise the video.")
-                    os.chdir("AIs/")
+                    os.chdir("../AIs/")
                     process = subprocess.Popen(["./srmd-ncnn-vulkan", \
                         "-i", f"{tmpDirectory}/in", "-o", \
                         f"{tmpDirectory}/out", "-n", "8", "-s", "2"], \
@@ -226,13 +226,13 @@ def Handler(pOptions:dict, pVideo:video):
                     shutil.rmtree(f"{tmpDirectory}/in")
                     os.rename(f"{tmpDirectory}/out", f"{tmpDirectory}/in")
                     os.mkdir(f"{tmpDirectory}/out")
-                    os.chdir("..")
+                    os.chdir("../..")
                     print("\nFinished running SRMD.\n")
 
                 #Interpolation
                 if pVideo.getEstimNumOfRun != 0:
                     print("\nRunning interpolation software.")
-                    os.chdir("AIs/")
+                    os.chdir("../AIs/")
                     print(f"It's going to run {pVideo.getEstimNumOfRun(targetFPS)} times")
 
                     for i in range(pVideo.getEstimNumOfRun(targetFPS)):
@@ -262,7 +262,7 @@ def Handler(pOptions:dict, pVideo:video):
                         os.rename(f"{tmpDirectory}/out", f"{tmpDirectory}/in")
                         os.mkdir(f"{tmpDirectory}/out")
 
-                    os.chdir("..")
+                    os.chdir("../..")
                     print("\nFinished running interpolation software.")
 
                 print(f"\nEncoding {vidInFolder[:-4]}.mp4")
