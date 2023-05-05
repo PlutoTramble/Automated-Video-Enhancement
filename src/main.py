@@ -4,7 +4,8 @@ import os
 from shutil import rmtree
 import subprocess
 
-import MediaHandler
+from src.handler import VulkanHandle
+from src.media.Media import VideoMedia
 
 current_dir = os.getcwd()
 
@@ -109,7 +110,7 @@ def getOpt(argv):
     return options
 
 
-def makeTempDir():
+def make_temp_dir():
     print(f"Making temporary directory in : {tmpDirectory}")
     if os.path.exists(tmpDirectory):
         rmtree(tmpDirectory)
@@ -128,8 +129,9 @@ if __name__ == "__main__":
     # Checking if the "AIs" folder and its content exists"
     if not os.path.exists(f"{current_dir}/AIs"):
         os.mkdir(f"{current_dir}/AIs")
-        raise FileNotFoundError("The \"AIs\" directory didn't exist. " \
-                                "The program created it but you need to put stuff in it. " \
+        raise FileNotFoundError("The \"AIs\" directory didn't exist. "
+                                "The program created it but you need "
+                                "to put stuff in it. "
                                 "Follow the instructions on the repository.")
 
     if not os.path.exists(f"{current_dir}/AIs/rife-ncnn-vulkan") or \
@@ -138,27 +140,28 @@ if __name__ == "__main__":
             not os.path.exists(f"{current_dir}/AIs/IFRNet_L_Vimeo90K") or \
             not os.path.exists(f"{current_dir}/AIs/srmd-ncnn-vulkan") or \
             not os.path.exists(f"{current_dir}/AIs/models-srmd"):
-        raise FileNotFoundError("There are file(s) that are missing." \
-                                " Please go look Where to put stuff in the repository.")
+        raise FileNotFoundError("There are file(s) that are missing."
+                                " Please go look where to put stuff in the repository.")
 
     # Checking if user have ffmpeg
     try:
-        subprocess.call(["ffmpeg"], shell=False, \
+        subprocess.call(["ffmpeg"], shell=False,
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError("You need to install ffmpeg before running this program."):
         sys.exit(2)
 
-    ## Where the handling happens
+    # Where the handling happens
     if options["isInputAFile"]:
-        makeTempDir()
-        Video = MediaHandler.video(options["input"])
-        MediaHandler.Handler(options, Video)
+        make_temp_dir()
+        video = VideoMedia(options["input"])
+        VulkanHandle.handler(options, video)
         rmtree(tmpDirectory)
-    else:
-        videosInInput = os.listdir(options["input"])
-        videosInInput.sort()
-        for vid in videosInInput:
-            makeTempDir()
-            Video = MediaHandler.video(f'{options["input"]}/{vid}')
-            MediaHandler.Handler(options, Video)
-            rmtree(tmpDirectory)
+        exit(0)
+
+    videos_in_input = os.listdir(options["input"])
+    videos_in_input.sort()
+    for vid in videos_in_input:
+        make_temp_dir()
+        video = VideoMedia(f'{options["input"]}/{vid}')
+        VulkanHandle.handler(options, video)
+        rmtree(tmpDirectory)
