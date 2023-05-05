@@ -81,10 +81,62 @@ def __set_ffmpeg_params(vid_width: int, vid_height: int, target_fps: float):
     return uhd, crf_value, target_fps
 
 
+def __is_suffix_video(rec_suffixes: list[str], vid_suffix: str) -> bool:
+    for suffix in rec_suffixes:
+        if suffix == vid_suffix:
+            return True
+    return False
+
+
+def __augment_resolution(current_video: VideoMedia,
+                         resolution_threshold: str,
+                         tmp_directory: str):
+    if current_video.is_under_resolution_threshold(resolution_threshold):
+        print("\nRunning SRMD to denoise the video.")
+        os.chdir("../AIs/")
+        process = subprocess.Popen(["./srmd-ncnn-vulkan",
+                                    "-i", f"{tmp_directory}/in", "-o",
+                                    f"{tmp_directory}/out", "-n", "8",
+                                    "-s", "2"],
+                                   shell=False,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        ai_show_progress(process, f"{tmp_directory}/in",
+                         f"{tmp_directory}/out", True)
+        shutil.rmtree(f"{tmp_directory}/in")
+        os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
+        os.mkdir(f"{tmp_directory}/out")
+        os.chdir("../..")
+        print("\nFinished running SRMD.\n")
+
+
+def __interpolate(current_video: VideoMedia, target_fps: float,
+                  tmp_directory: str, uhd: str):
+    number_of_iterations: int = current_video.get_estim_num_of_run(target_fps)
+    if number_of_iterations > 0:
+        print("\nRunning interpolation software.")
+        os.chdir("../AIs/")
+        print(f"It's going to run {number_of_iterations} times")
+
+        for i in range(number_of_iterations):
+            process = subprocess.Popen(["./rife-ncnn-vulkan", "-i",
+                                        f"{tmp_directory}/in", "-o",
+                                        f"{tmp_directory}/out", "-m",
+                                        "rife-v2.3", f"{uhd}"], shell=False,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+            ai_show_progress(process, f"{tmp_directory}/in",
+                             f"{tmp_directory}/out", False)
+            current_video.fps = current_video.fps * 2
+            shutil.rmtree(f"{tmp_directory}/in")
+            os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
+            os.mkdir(f"{tmp_directory}/out")
+        os.chdir("../..")
+        print("\nFinished running interpolation software.")
 
 
 def handler(options: dict, current_video: VideoMedia):
-    suffixes_video: list[str] = \
+    recognized_suffixes_video: list[str] = \
         [".avi", ".mp4", ".mov", ".wmv", ".3gp", ".mpg", ".leotmv"]
     output_path: str = options["output"]
     tmp_directory: str = f"{options['temporaryDirectoryLocation']}/ave-tmp"
@@ -93,11 +145,13 @@ def handler(options: dict, current_video: VideoMedia):
     resolution_threshold: str = options['resolution_threshold']
     ffmpeg_output: str = ""
     crf_value: int = 0
-    uhd = ""
+    uhd: str = ""
 
     if not __is_something_todo(current_video,
                                resolution_threshold,
                                target_fps):
+        print(f"Nothing needs to be done with {current_video.filename} . \n "
+              f"Passing.")
         if not is_output_file:
             print("Copying anyway to output folder")
             shutil.copy(current_video.path, output_path)
@@ -113,111 +167,73 @@ def handler(options: dict, current_video: VideoMedia):
                                                      current_video.vid_height,
                                                      target_fps)
 
-    # TODO : do rewrite of function from here
     # Starting the process
-    for suffix in suffixes_video:  # Checking the video suffix
-        if current_video.suffix == suffix:
-            print("\nExtracting audio from video...")
-            os.system(f"ffmpeg -loglevel error -stats -y -i {current_video.path} " \
-                      f"-vn -c:a aac {tmp_directory}/audio.m4a")
+    if not __is_suffix_video(recognized_suffixes_video, current_video.suffix):
+        print(f"The video suffix '{current_video.suffix}' "
+              f"is not recognized... \nSkipping {current_video.filename} ...")
+        return
 
-            print("\nSegmenting video into temporary directory.")
-            os.system(f"ffmpeg -loglevel error -stats -y -i {current_video.path} " \
-                      f"-c:v copy -segment_time 00:02:00.00 " \
-                      f"-f segment -reset_timestamps 1 {tmp_directory}/vidin/%03d{current_video.suffix}")
+    print("\nExtracting audio from video...")
+    os.system(f"ffmpeg -loglevel error -stats -y -i {current_video.path} "
+              f"-vn -c:a aac {tmp_directory}/audio.m4a")
 
-            videosInFolder = os.listdir(f"{tmp_directory}/vidin")
-            videosInFolder.sort()
+    print("\nSegmenting video into temporary directory.")
+    os.system(f"ffmpeg -loglevel error -stats -y -i {current_video.path} "
+              f"-c:v copy -segment_time 00:02:00.00 "
+              f"-f segment -reset_timestamps 1 "
+              f"{tmp_directory}/vidin/%03d{current_video.suffix}")
 
-            filelist = open(f"{tmp_directory}/temporary_file.txt", "x")
-            filelist.close()
+    vids_input_folder: list[str] = os.listdir(f"{tmp_directory}/vidin")
+    vids_input_folder.sort()
 
-            for vidInFolder in videosInFolder:
-                # Writing down the new location of video when it will finish to process
-                filelist = open(f"{tmp_directory}/temporary_file.txt", "a")
-                fileLocation = f"{tmp_directory}/vidout/{vidInFolder[:-4]}.mp4"
-                filelist.write("file '%s'\n" % fileLocation)
-                filelist.close()
+    filelist = open(f"{tmp_directory}/temporary_file.txt", "x")
+    filelist.close()
 
-                print("\nExtracting all frames from video into temporary directory.")
-                os.system(f"ffmpeg -loglevel error -stats -y " \
-                          f"-i {tmp_directory}/vidin/{vidInFolder} " \
-                          f"-r {str(current_video.fps)} {current_video.getColorProfileSettings('png')} " \
-                          f"{tmp_directory}/in/%08d.png")
+    for selected_video in vids_input_folder:
+        # Writing down the new location of video when it will finish to process
+        filelist = open(f"{tmp_directory}/temporary_file.txt", "a")
+        file_location = f"{tmp_directory}/vidout/{selected_video[:-4]}.mp4"
+        filelist.write("file '%s'\n" % file_location)
+        filelist.close()
 
-                # SRMD
-                if current_video.isUnderResolutionThreshold(resolution_threshold):
-                    print("\nRunning SRMD to denoise the video.")
-                    os.chdir("../AIs/")
-                    process = subprocess.Popen(["./srmd-ncnn-vulkan", \
-                                                "-i", f"{tmp_directory}/in", "-o", \
-                                                f"{tmp_directory}/out", "-n", "8", "-s", "2"], \
-                                               shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    AIRunning(process, f"{tmp_directory}/in", f"{tmp_directory}/out", True)
-                    shutil.rmtree(f"{tmp_directory}/in")
-                    os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
-                    os.mkdir(f"{tmp_directory}/out")
-                    os.chdir("../..")
-                    print("\nFinished running SRMD.\n")
+        print("\nExtracting all frames from video into temporary directory.")
+        os.system(f"ffmpeg -loglevel error -stats -y " 
+                  f"-i {tmp_directory}/vidin/{vids_input_folder} "
+                  f"-r {str(current_video.fps)} "
+                  f"{current_video.get_color_profile_settings('png')} "
+                  f"{tmp_directory}/in/%08d.png")
 
-                # Interpolation
-                if current_video.getEstimNumOfRun != 0:
-                    print("\nRunning interpolation software.")
-                    os.chdir("../AIs/")
-                    print(f"It's going to run {current_video.getEstimNumOfRun(target_fps)} times")
+        __augment_resolution(current_video,
+                             resolution_threshold,
+                             tmp_directory)
 
-                    for i in range(current_video.getEstimNumOfRun(target_fps)):
-                        # process = ""
-                        # if ((pVideo.vidWidth > 1920 and pVideo.vidHeight > 1080) or \
-                        #         (pVideo.vidWidth > 1080 and pVideo.vidHeight > 1920)) or \
-                        #         (pVideo.fps <= 25) or \
-                        #         (len(os.listdir(f"{tmp_directory}/in")) >= 3235): # tmp: ifrnet can't do more than 3235 images in 1080p
-                        #     process = subprocess.Popen(["./rife-ncnn-vulkan", "-i", \
-                        #         f"{tmp_directory}/in", "-o", f"{tmp_directory}/out", "-m", \
-                        #         "rife-v2.3", f"{uhd}"], shell=False, \
-                        #         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        #     print("Running RIFE...")
-                        # else:
-                        #     process = subprocess.Popen(["./ifrnet-ncnn-vulkan", "-i", \
-                        #         f"{tmp_directory}/in", "-o", f"{tmp_directory}/out", "-m", \
-                        #         "IFRNet_L_Vimeo90K", f"{uhd}"], \
-                        #         shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        #     print("Running IFRNet")
-                        process = subprocess.Popen(["./rife-ncnn-vulkan", "-i", \
-                                                    f"{tmp_directory}/in", "-o", f"{tmp_directory}/out", "-m", \
-                                                    "rife-v2.3", f"{uhd}"], shell=False, \
-                                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        AIRunning(process, f"{tmp_directory}/in", f"{tmp_directory}/out", False)
-                        current_video.fps = current_video.fps * 2
-                        shutil.rmtree(f"{tmp_directory}/in")
-                        os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
-                        os.mkdir(f"{tmp_directory}/out")
+        __interpolate(current_video, target_fps, tmp_directory, uhd)
 
-                    os.chdir("../..")
-                    print("\nFinished running interpolation software.")
+        print(f"\nEncoding {vids_input_folder[:-4]}.mp4")
+        os.system(f"ffmpeg -loglevel error -stats -y -framerate "
+                  f"{current_video.get_exaggerated_fps(target_fps)} -i "
+                  f"{tmp_directory}/in/%08d.png -c:v libx265 -crf {crf_value} "
+                  f"-preset veryslow {current_video.ffmpeg_bitrate_command()} "
+                  f"-r {target_fps} "
+                  f"{current_video.get_color_profile_settings('vid')} "
+                  f"{tmp_directory}/vidout/{vids_input_folder[:-4]}.mp4")
 
-                print(f"\nEncoding {vidInFolder[:-4]}.mp4")
-                os.system(f"ffmpeg -loglevel error -stats " \
-                          f"-y -framerate {current_video.getExageratedFPS(target_fps)} " \
-                          f"-i {tmp_directory}/in/%08d.png -c:v libx265 -crf {crf_value} " \
-                          f"-preset veryslow {current_video.ffmpegBitrateCommand()} -r {target_fps} " \
-                          f"{current_video.getColorProfileSettings('vid')} " \
-                          f"{tmp_directory}/vidout/{vidInFolder[:-4]}.mp4")
+    # Writing the final result
+    print(f"\nFinalizing {current_video.filename[:-4]}.mp4\n")
+    os.system(f"ffmpeg -loglevel error -f concat -safe 0 -i "
+              f"{tmp_directory}/temporary_file.txt -c copy "
+              f"{ffmpeg_output}a.mp4")
 
-            ## Writing the final result
-            print(f"\nFinalizing {current_video.filename[:-4]}.mp4\n")
-            os.system(f"ffmpeg -loglevel error -f concat -safe 0 " \
-                      f"-i {tmp_directory}/temporary_file.txt -c copy {ffmpeg_output}a.mp4")
+    if os.path.exists(f"{tmp_directory}/audio.m4a"):  # If the video has audio
+        os.system(f"ffmpeg -loglevel error -i {ffmpeg_output}a.mp4 "
+                  f"-i {tmp_directory}/audio.m4a -c:a copy "
+                  f"-c:v copy {ffmpeg_output}n.mp4")
+    else:
+        shutil.copy(f"{ffmpeg_output}a.mp4", f"{ffmpeg_output}n.mp4")
 
-            if os.path.exists(f"{tmp_directory}/audio.m4a"):  # If the video has audio
-                os.system(f"ffmpeg -loglevel error -i {ffmpeg_output}a.mp4 " \
-                          f"-i {tmp_directory}/audio.m4a -c:a copy " \
-                          f"-c:v copy {ffmpeg_output}n.mp4")
-            else:
-                shutil.copy(f"{ffmpeg_output}a.mp4", f"{ffmpeg_output}n.mp4")
+    os.system(f"ffmpeg -loglevel error -i {current_video.path} -i "
+              f"{ffmpeg_output}n.mp4 -map 1 -c copy -map_metadata 0 "
+              f"-tag:v hvc1 {ffmpeg_output}.mp4")
 
-            os.system(f"ffmpeg -loglevel error -i {current_video.path} -i {ffmpeg_output}n.mp4 " \
-                      f"-map 1 -c copy -map_metadata 0 -tag:v hvc1 {ffmpeg_output}.mp4")
-
-            os.remove(f"{ffmpeg_output}a.mp4")
-            os.remove(f"{ffmpeg_output}n.mp4")
+    os.remove(f"{ffmpeg_output}a.mp4")
+    os.remove(f"{ffmpeg_output}n.mp4")
