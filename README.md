@@ -7,9 +7,6 @@ Depending on your system and the video itself, it can take a very long time befo
 ### Note 2
 For the time being, IFRNet will not be used because it is still very new and very buggy. RIFE still do a great job and is far more efficient than IFRNet.
 
-### Note 3
-Code is garbage. For now it works (with bugs). I plan to rewrite it and implement testing (just because).
-
 ## About RIFE, IFRNET and SRMD
 ### RIFE
 RIFE is used to interpolate videos. In this case, it's used for videos that are more than 1080p.
@@ -40,8 +37,8 @@ main.py -i <input-file/folder> -o <output-file/folder>
 
 ## Installation
 ### Dependencies
-* Has only have been tested on Linux
-* Python 3
+* Has only had been tested on Linux
+* Python 3.11
   * opencv2
 * ffmpeg
 * Large storage device for temporary directory (optionnal but recommended)
@@ -56,5 +53,5 @@ The directory should look like this:
 ![My Image](images/whereToPutStuff.png)
 
 # TODO
-* Make it work on Mac OS (Needs testing)
+* Make it work on macOS (Needs testing)
 * Make it work on Windows

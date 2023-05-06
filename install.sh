@@ -21,7 +21,7 @@ echo "The installation will start in 5 seconds"
 sleep 5
 
 ## Check if user has AIs directory and is on the working directory
-if [ -d "AIs/" -a -f "main.py" ]; then
+if [ -d "AIs/" -a -f "src/main.py" ]; then
     cd AIs
     OS=ubuntu
     if [[ $OSTYPE == 'darwin'* ]]; then #If mac os
