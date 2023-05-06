@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 
-from src.media.Media import VideoMedia
+from multimedia.Media import VideoMedia
 
 
 def ai_show_progress(process: subprocess.Popen,
