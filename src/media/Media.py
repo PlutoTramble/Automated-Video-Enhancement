@@ -47,8 +47,8 @@ class VideoMedia:
     # FIXME handle properly color profile
     # Sets the color profile settings for ffmpeg
     def get_color_profile_settings(self, vid_or_png: str) -> str:
-        if vid_or_png.lower() != 'vid' or vid_or_png.lower() != 'png':
-            raise IOError("The option is either 'vid' or 'png'.")
+        if vid_or_png.lower() != 'vid' and vid_or_png.lower() != 'png':
+            raise IOError("The option is neither 'vid' or 'png'.")
 
         color_info: list[str] = os.popen(f"ffprobe -v error -show_entries "
                                          f"stream=pix_fmt,color_space,color_range,"
@@ -59,7 +59,7 @@ class VideoMedia:
         color_setting_vid: str = ""
 
         pixel_format: str = color_info[0][8:]
-        if not pixel_format == 'unknown':
+        if pixel_format != 'unknown':
             color_setting_vid += "-pix_fmt " + pixel_format
         else:
             color_setting_vid += "-pix_fmt yuv420p"
@@ -67,16 +67,16 @@ class VideoMedia:
         color_setting_png: str = "-pix_fmt rgb24"
 
         color_space: str = color_info[2][12:]
-        if color_space is not 'unknown':
+        if color_space != 'unknown':
             color_setting_vid += " -colorspace " + color_space
             color_setting_png += " -colorspace " + color_space
 
         color_primaries: str = color_info[4][16:]
-        if color_primaries is not 'unknown':
+        if color_primaries != 'unknown':
             color_setting_vid += " -color_primaries " + color_primaries
             color_setting_png += " -color_primaries " + color_primaries
 
-        if vid_or_png.lower() is 'vid':
+        if vid_or_png.lower() == 'vid':
             return color_setting_vid
         else:
             return color_setting_png

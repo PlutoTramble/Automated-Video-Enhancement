@@ -13,11 +13,11 @@ current_dir = os.getcwd()
 def getOpt(argv):
     options = {"input": "",
                "output": "",
-               "temporaryDirectoryLocation": "",
-               "isInputAFile": True,
-               "isOutputAFile": True,
-               "targetFPS": 60,
-               "resolutionThreshold": "720x480"
+               "temporary_directory_location": "",
+               "is_input_a_file": True,
+               "is_output_a_file": True,
+               "target_fps": 60,
+               "resolution_threshold": "720x480"
                }
 
     try:
@@ -51,7 +51,7 @@ def getOpt(argv):
 
             if os.path.exists(path):
                 if os.path.isdir(path):
-                    options["isInputAFile"] = False
+                    options["is_input_a_file"] = False
             else:
                 raise IOError("Either the file or directory does not exist for the input")
 
@@ -73,14 +73,14 @@ def getOpt(argv):
                         print("Stoping program...")
                         sys.exit()
                 else:
-                    options["isOutputAFile"] = False
+                    options["is_output_a_file"] = False
 
         # Argument for temporary directory location
         elif option in ("-t", "--tmp-location"):
             path = f"{current_dir}/{argument}"
             if argument[0] == "/":
                 path = argument
-            options["temporaryDirectoryLocation"] = path
+            options["temporary_directory_location"] = path
 
             if os.path.exists(path):
                 if os.path.isfile(path):
@@ -93,38 +93,38 @@ def getOpt(argv):
         # Argument for frames per second
         elif option in ("-f", "--fps"):
             if int(argument) > 180:
-                options["targetFPS"] = 180
+                options["target_fps"] = 180
             else:
-                options["targetFPS"] = int(argument)
+                options["target_fps"] = int(argument)
 
         # Nothing to do for the resolution threshold.
 
     # Assuring that it's logical
-    if options['temporaryDirectoryLocation'] == "":
-        options["temporaryDirectoryLocation"] = current_dir
+    if options['temporary_directory_location'] == "":
+        options["temporary_directory_location"] = current_dir
 
-    if options["isInputAFile"] == False and \
-            options["isOutputAFile"] == True:
+    if options["is_input_a_file"] == False and \
+            options["is_output_a_file"] == True:
         raise IOError("It's impossible to take a whole directory into a file.")
 
     return options
 
 
-def make_temp_dir():
-    print(f"Making temporary directory in : {tmpDirectory}")
-    if os.path.exists(tmpDirectory):
-        rmtree(tmpDirectory)
+def make_temp_dir(tmp_dir: str):
+    print(f"Making temporary directory in : {tmp_dir}")
+    if os.path.exists(tmp_dir):
+        rmtree(tmp_dir)
 
-    os.mkdir(tmpDirectory)
-    os.mkdir(f"{tmpDirectory}/in")
-    os.mkdir(f"{tmpDirectory}/out")
-    os.mkdir(f"{tmpDirectory}/vidin")
-    os.mkdir(f"{tmpDirectory}/vidout")
+    os.mkdir(tmp_dir)
+    os.mkdir(f"{tmp_dir}/in")
+    os.mkdir(f"{tmp_dir}/out")
+    os.mkdir(f"{tmp_dir}/vidin")
+    os.mkdir(f"{tmp_dir}/vidout")
 
 
 if __name__ == "__main__":
     options = getOpt(sys.argv[1:])
-    tmpDirectory = f'{options["temporaryDirectoryLocation"]}/ave-tmp'
+    tmp_directory: str = f'{options["temporary_directory_location"]}/ave-tmp'
 
     # Checking if the "AIs" folder and its content exists"
     if not os.path.exists(f"{current_dir}/AIs"):
@@ -151,17 +151,17 @@ if __name__ == "__main__":
         sys.exit(2)
 
     # Where the handling happens
-    if options["isInputAFile"]:
-        make_temp_dir()
+    if options["is_input_a_file"]:
+        make_temp_dir(tmp_directory)
         video = VideoMedia(options["input"])
         VulkanHandle.handler(options, video)
-        rmtree(tmpDirectory)
+        rmtree(tmp_directory)
         exit(0)
 
     videos_in_input = os.listdir(options["input"])
     videos_in_input.sort()
     for vid in videos_in_input:
-        make_temp_dir()
+        make_temp_dir(tmp_directory)
         video = VideoMedia(f'{options["input"]}/{vid}')
         VulkanHandle.handler(options, video)
-        rmtree(tmpDirectory)
+        rmtree(tmp_directory)

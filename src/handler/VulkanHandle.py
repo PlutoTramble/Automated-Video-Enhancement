@@ -93,7 +93,7 @@ def __augment_resolution(current_video: VideoMedia,
                          tmp_directory: str):
     if current_video.is_under_resolution_threshold(resolution_threshold):
         print("\nRunning SRMD to denoise the video.")
-        os.chdir("../AIs/")
+        os.chdir("AIs/")
         process = subprocess.Popen(["./srmd-ncnn-vulkan",
                                     "-i", f"{tmp_directory}/in", "-o",
                                     f"{tmp_directory}/out", "-n", "8",
@@ -106,7 +106,7 @@ def __augment_resolution(current_video: VideoMedia,
         shutil.rmtree(f"{tmp_directory}/in")
         os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
         os.mkdir(f"{tmp_directory}/out")
-        os.chdir("../..")
+        os.chdir("..")
         print("\nFinished running SRMD.\n")
 
 
@@ -115,7 +115,7 @@ def __interpolate(current_video: VideoMedia, target_fps: float,
     number_of_iterations: int = current_video.get_estim_num_of_run(target_fps)
     if number_of_iterations > 0:
         print("\nRunning interpolation software.")
-        os.chdir("../AIs/")
+        os.chdir("AIs/")
         print(f"It's going to run {number_of_iterations} times")
 
         for i in range(number_of_iterations):
@@ -127,11 +127,10 @@ def __interpolate(current_video: VideoMedia, target_fps: float,
                                        stderr=subprocess.PIPE)
             ai_show_progress(process, f"{tmp_directory}/in",
                              f"{tmp_directory}/out", False)
-            current_video.fps = current_video.fps * 2
             shutil.rmtree(f"{tmp_directory}/in")
             os.rename(f"{tmp_directory}/out", f"{tmp_directory}/in")
             os.mkdir(f"{tmp_directory}/out")
-        os.chdir("../..")
+        os.chdir("..")
         print("\nFinished running interpolation software.")
 
 
@@ -139,7 +138,7 @@ def handler(options: dict, current_video: VideoMedia):
     recognized_suffixes_video: list[str] = \
         [".avi", ".mp4", ".mov", ".wmv", ".3gp", ".mpg", ".leotmv"]
     output_path: str = options["output"]
-    tmp_directory: str = f"{options['temporaryDirectoryLocation']}/ave-tmp"
+    tmp_directory: str = f"{options['temporary_directory_location']}/ave-tmp"
     is_output_file: bool = options["is_output_a_file"]
     target_fps: float = options["target_fps"]
     resolution_threshold: str = options['resolution_threshold']
@@ -183,22 +182,23 @@ def handler(options: dict, current_video: VideoMedia):
               f"-f segment -reset_timestamps 1 "
               f"{tmp_directory}/vidin/%03d{current_video.suffix}")
 
-    vids_input_folder: list[str] = os.listdir(f"{tmp_directory}/vidin")
-    vids_input_folder.sort()
+    temp_seg_vids_in: list[str] = os.listdir(f"{tmp_directory}/vidin")
+    temp_seg_vids_in.sort()
 
     filelist = open(f"{tmp_directory}/temporary_file.txt", "x")
     filelist.close()
 
-    for selected_video in vids_input_folder:
+    for temp_seg_vid in temp_seg_vids_in:
         # Writing down the new location of video when it will finish to process
         filelist = open(f"{tmp_directory}/temporary_file.txt", "a")
-        file_location = f"{tmp_directory}/vidout/{selected_video[:-4]}.mp4"
-        filelist.write("file '%s'\n" % file_location)
+        tmp_vid_out_location = \
+            f"{tmp_directory}/vidout/{temp_seg_vid[:-4]}.mp4"
+        filelist.write("file '%s'\n" % tmp_vid_out_location)
         filelist.close()
 
         print("\nExtracting all frames from video into temporary directory.")
         os.system(f"ffmpeg -loglevel error -stats -y " 
-                  f"-i {tmp_directory}/vidin/{vids_input_folder} "
+                  f"-i {tmp_directory}/vidin/{temp_seg_vid} "
                   f"-r {str(current_video.fps)} "
                   f"{current_video.get_color_profile_settings('png')} "
                   f"{tmp_directory}/in/%08d.png")
@@ -209,14 +209,14 @@ def handler(options: dict, current_video: VideoMedia):
 
         __interpolate(current_video, target_fps, tmp_directory, uhd)
 
-        print(f"\nEncoding {vids_input_folder[:-4]}.mp4")
+        print(f"\nEncoding {temp_seg_vid[:-4]}.mp4")
         os.system(f"ffmpeg -loglevel error -stats -y -framerate "
                   f"{current_video.get_exaggerated_fps(target_fps)} -i "
                   f"{tmp_directory}/in/%08d.png -c:v libx265 -crf {crf_value} "
                   f"-preset veryslow {current_video.ffmpeg_bitrate_command()} "
                   f"-r {target_fps} "
                   f"{current_video.get_color_profile_settings('vid')} "
-                  f"{tmp_directory}/vidout/{vids_input_folder[:-4]}.mp4")
+                  f"{tmp_directory}/vidout/{temp_seg_vid[:-4]}.mp4")
 
     # Writing the final result
     print(f"\nFinalizing {current_video.filename[:-4]}.mp4\n")
