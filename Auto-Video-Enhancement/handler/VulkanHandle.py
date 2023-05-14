@@ -4,7 +4,7 @@ import subprocess
 import sys
 import time
 
-from src.media.Media import VideoMedia
+from multimedia.Media import VideoMedia
 
 
 def ai_show_progress(process: subprocess.Popen,
@@ -210,6 +210,8 @@ def handler(options: dict, current_video: VideoMedia):
         __interpolate(current_video, target_fps, tmp_directory, uhd)
 
         print(f"\nEncoding {temp_seg_vid[:-4]}.mp4")
+
+        # Get frames from 'in' because __interpolate renames 'out' to 'in'
         os.system(f"ffmpeg -loglevel error -stats -y -framerate "
                   f"{current_video.get_exaggerated_fps(target_fps)} -i "
                   f"{tmp_directory}/in/%08d.png -c:v libx265 -crf {crf_value} "
@@ -217,6 +219,10 @@ def handler(options: dict, current_video: VideoMedia):
                   f"-r {target_fps} "
                   f"{current_video.get_color_profile_settings('vid')} "
                   f"{tmp_directory}/vidout/{temp_seg_vid[:-4]}.mp4")
+
+        # Making a new 'in'. So if next iteration, old files won't stay.
+        shutil.rmtree(f"{tmp_directory}/in")
+        os.mkdir(f"{tmp_directory}/in")
 
     # Writing the final result
     print(f"\nFinalizing {current_video.filename[:-4]}.mp4\n")

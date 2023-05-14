@@ -4,8 +4,8 @@ import os
 from shutil import rmtree
 import subprocess
 
-from src.handler import VulkanHandle
-from src.media.Media import VideoMedia
+from handler import VulkanHandle
+from multimedia.Media import VideoMedia
 
 current_dir = os.getcwd()
 
